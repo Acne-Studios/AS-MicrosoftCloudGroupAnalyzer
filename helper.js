@@ -7,6 +7,27 @@ const identity = require('@azure/identity')
 var fs = require('fs');
 let converter = require('json-2-csv');
 const path = require('path');
+const { execFile } = require('child_process');
+
+// HTML escape to prevent XSS in generated report
+const escapeHtml = (value = '') => String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
+// open URL without shell=true to avoid DEP0190 warning
+const safeOpen = (url) => {
+    const platform = process.platform;
+    if (platform === 'darwin') {
+        execFile('open', [url]);
+    } else if (platform === 'win32') {
+        execFile('cmd', ['/c', 'start', '', url]);
+    } else {
+        execFile('xdg-open', [url]);
+    }
+};
 
 // express
 try {
@@ -239,24 +260,29 @@ async function generateWebReport(arr) { // generates and opens a web report
         // list groups in scope
         debugLogger(`Looping over each group in scope`)
         global.groupsInScope.forEach(group => {
-            htmlContent += `<li>${group.groupName}</li>`;
+            htmlContent += `<li>${escapeHtml(group.groupName || '')}</li>`;
         })
         
         htmlContent += '</ul></div> <p></p>';
 
         let printedServices = new Set();
-        
-        arr.sort((a, b) => {
-            // First, sort by service
-            const serviceComparison = a.service.localeCompare(b.service);
-          
-            // If services are equal, then sort by groupName
-            if (serviceComparison === 0) {
-              return a.groupName.localeCompare(b.groupName);
-            }
-          
-            return serviceComparison;
-          }).forEach(item => {
+
+        const normalized = (Array.isArray(arr) ? arr : [])
+            .filter(Boolean)
+            .map(item => ({
+                ...item,
+                service: (item && item.service) ? String(item.service) : 'Unknown service',
+                groupName: (item && item.groupName) ? String(item.groupName) : '',
+                name: (item && item.name) ? String(item.name) : '',
+                details: (item && item.details) ? String(item.details) : ''
+            }))
+            .sort((a, b) => {
+                const serviceComparison = a.service.localeCompare(b.service);
+                if (serviceComparison !== 0) return serviceComparison;
+                return a.groupName.localeCompare(b.groupName);
+            });
+
+        normalized.forEach(item => {
             // if the service is not yet evaluated for the first time, then print the service
             if (!printedServices.has(item.service)) {
                 // Close the previous ul if it was opened
@@ -266,19 +292,24 @@ async function generateWebReport(arr) { // generates and opens a web report
                 
                 htmlContent += `
                     <div class="box mt-4 p-4">
-                    <h3 class="mt-1"><span class="badge fs-2 font-bold color-accent px-2 py-2">${item.service}</span> <span class="fs-5 font-bold color-secondary">assignments:</span></h3>
+                    <h3 class="mt-1"><span class="badge fs-2 font-bold color-accent px-2 py-2">${escapeHtml(item.service)}</span> <span class="fs-5 font-bold color-secondary">assignments:</span></h3>
                     <ul class="list-group list-group-flush ms-3 color-secondary">`;
                 
                 printedServices.add(item.service);
             }
         
+            const isUser = item.groupName.includes('@');
+            const safeGroupName = escapeHtml(item.groupName);
+            const safeName = escapeHtml(item.name);
+            const safeDetails = escapeHtml(item.details);
+
             htmlContent += `
                 <li class="list-group-item d-flex justify-content-between align-items-start color-secondary">
                     
                 <div class="row align-items-center w-100">
-                        <div class="col font-bold"> ${(item.groupName.includes('@')) ? 'user' : 'group'}: <span class="badge-blue font-bold color-primary px-2 py-0">${item.groupName}</span></div>
-                        <div class="col font-bold">${item.name}</div>
-                        <div class="col-3 text-end">${item.details}</div>
+                        <div class="col font-bold"> ${isUser ? 'user' : 'group'}: <span class="badge-blue font-bold color-primary px-2 py-0">${safeGroupName}</span></div>
+                        <div class="col font-bold">${safeName}</div>
+                        <div class="col-3 text-end">${safeDetails}</div>
                     </div>
                 </li>`;
         });
@@ -304,7 +335,7 @@ async function generateWebReport(arr) { // generates and opens a web report
 
         try {
             debugLogger(`Opening web report...`)
-            await require('open')(`http://localhost:${port}`);    
+            safeOpen(`http://localhost:${port}`);
             console.log(` [${fgColor.FgGray}i${colorReset}] Use CTRL + C to exit.`)
         } catch (error) {
             console.error(` [${fgColor.FgRed}X${colorReset}] Error opening the web report\n\n`, error)

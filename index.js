@@ -107,10 +107,12 @@ async function init(input) {
                 getInput(token?.accessToken, tokenAzure?.accessToken, tenantID)
             } else if (token && input) { // if this function parameter 'input' is provided, continue
                 let groupObject = await helper.callApi(`https://graph.microsoft.com/v1.0/groups/${input[0]}?$select=id,displayName`, token?.accessToken)
-                handleInput(token?.accessToken, tokenAzure?.accessToken, [{id: input[0], displayName: groupObject.displayName}], tenantID)
+                const safeName = groupObject?.displayName || input[0];
+                handleInput(token?.accessToken, tokenAzure?.accessToken, [{id: input[0], displayName: safeName}], tenantID)
             } else if (token && parameterID?.length > 0) { // if this script parameter is provided, continue with the first script parameter
                 let groupObject = await helper.callApi(`https://graph.microsoft.com/v1.0/groups/${parameterID?.slice(0, 1)[0]}?$select=id,displayName`, token?.accessToken)
-                handleInput(token?.accessToken, tokenAzure?.accessToken,  [{id: parameterID?.slice(0, 1)[0], displayName: groupObject?.displayName}], tenantID)
+                const safeName = groupObject?.displayName || parameterID?.slice(0, 1)[0];
+                handleInput(token?.accessToken, tokenAzure?.accessToken,  [{id: parameterID?.slice(0, 1)[0], displayName: safeName}], tenantID)
             }
         }
     } catch (error) {
@@ -158,10 +160,12 @@ async function handleInput(accessToken, accessTokenAzure, groupID, tenantID) {
     for (let group of groupID) {
         helper.debugLogger(`Fetching group ID and group name...`)
         
+        const resolvedName = group.displayName || group.groupName || group.id || 'Unknown group';
+
         // add group to scope
-        console.log(` - '${group.displayName}'`)
+        console.log(` - '${resolvedName}'`)
         helper.debugLogger(`Adding group to scope...`)
-        global.groupsInScope.push({ groupID: group.id, groupName: group.displayName})
+        global.groupsInScope.push({ groupID: group.id, groupName: resolvedName})
 
         // also add subgroups to scope of this scan
         let memberOfOtherGroups = await require(`./service/groups`).init(accessToken, group.id, tenantID)
@@ -199,8 +203,26 @@ async function handleInput(accessToken, accessTokenAzure, groupID, tenantID) {
         console.log(` [${fgColor.FgGreen}✓${colorReset}] Skipping scope with ${skipValue} group(s)`);
     }
 
+    await resolveMissingGroupNames(accessToken);
+
     console.log(` [${fgColor.FgGray}i${colorReset}] Calculating Entra group assignments...`)
     calculateMemberships(accessToken, accessTokenAzure, global.groupsInScope, tenantID)
+}
+
+async function resolveMissingGroupNames(accessToken) {
+    const uuidLike = /^[0-9a-fA-F-]{36}$/;
+    const updates = global.groupsInScope.map(async (g, idx) => {
+        if (g?.groupName && !uuidLike.test(g.groupName)) return;
+        try {
+            const res = await helper.callApi(`https://graph.microsoft.com/v1.0/groups/${g.groupID}?$select=displayName`, accessToken);
+            if (res?.displayName) {
+                global.groupsInScope[idx].groupName = res.displayName;
+            }
+        } catch (e) {
+            helper.debugLogger(`Could not resolve displayName for ${g.groupID}`);
+        }
+    });
+    await Promise.all(updates);
 }
 
 async function calculateMemberships(accessToken, accessTokenAzure, groupIDarray, tenantID) {
@@ -282,13 +304,22 @@ async function formatOutput(arr) {
         // if the service is not yet evaluated for the first time, then print the service
         if (!printedServices.has(item.service)) {
             const randomColor = scope.find(x => x.file == item.file)?.bgColor
-            console.log(`\n${randomColor} ${item.service} ${colorReset} assignments:`);
-            printedServices.add(item.service);
+            const safeService = item?.service || 'Unknown service';
+            console.log(`\n${randomColor} ${safeService} ${colorReset} assignments:`);
+            printedServices.add(safeService);
         }
 
         // if the item has the property 'details', then also print that property
-        let detailString = item.details ? ` ${fgColor.FgGray}(${item.detailsGroup} -- ${item.details})${colorReset}` : ` ${fgColor.FgGray}(${item.detailsGroup})${colorReset}`;
-        console.log(` - ${item.name}${detailString}`);
+        const safeGroupName = item?.groupName || 'Unknown group';
+        const safeDetailsGroup = item?.detailsGroup || `group '${safeGroupName}'`;
+        const safeDetails = item?.details || '';
+        const safeName = item?.name || '(no name)';
+
+        let detailString = safeDetails
+            ? ` ${fgColor.FgGray}(${safeDetailsGroup} -- ${safeDetails})${colorReset}`
+            : ` ${fgColor.FgGray}(${safeDetailsGroup})${colorReset}`;
+
+        console.log(` - ${safeName}${detailString}`);
     });
 
     console.log(`\n`)
