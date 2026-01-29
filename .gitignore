@@ -6,6 +6,7 @@ node_modules
 
 # Logs
 npm-debug.log*
+debug-log-**
 
 # MacOS files
 **/.DS_Store
