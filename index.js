@@ -297,29 +297,37 @@ const processGroupsInBatches = async (groupIDarray, scope, accessToken, accessTo
 }
 
 async function formatOutput(arr) {
-    // this set is used to track which services are already printed
-    let printedServices = new Set();
+    const grouped = arr
+        .filter(Boolean)
+        .map(item => ({
+            ...item,
+            groupName: item?.groupName || 'Unknown group',
+            service: item?.service || 'Unknown service',
+            name: item?.name || '(no name)',
+            details: item?.details || '',
+            detailsGroup: item?.detailsGroup || `group '${item?.groupName || 'Unknown group'}'`
+        }))
+        .sort((a, b) => a.groupName.localeCompare(b.groupName) || a.service.localeCompare(b.service));
 
-    arr.sort((a, b) => a.service.localeCompare(b.service)).forEach(item => {
-        // if the service is not yet evaluated for the first time, then print the service
-        if (!printedServices.has(item.service)) {
-            const randomColor = scope.find(x => x.file == item.file)?.bgColor
-            const safeService = item?.service || 'Unknown service';
-            console.log(`\n${randomColor} ${safeService} ${colorReset} assignments:`);
-            printedServices.add(safeService);
+    let currentGroup = '';
+    let currentService = '';
+    grouped.forEach(item => {
+        if (item.groupName !== currentGroup) {
+            currentGroup = item.groupName;
+            currentService = '';
+            console.log(`\n${fgColor.FgCyan}${currentGroup}${colorReset}`);
         }
 
-        // if the item has the property 'details', then also print that property
-        const safeGroupName = item?.groupName || 'Unknown group';
-        const safeDetailsGroup = item?.detailsGroup || `group '${safeGroupName}'`;
-        const safeDetails = item?.details || '';
-        const safeName = item?.name || '(no name)';
+        if (item.service !== currentService) {
+            currentService = item.service;
+            console.log(`  ${fgColor.FgYellow}${currentService}${colorReset}`);
+        }
 
-        let detailString = safeDetails
-            ? ` ${fgColor.FgGray}(${safeDetailsGroup} -- ${safeDetails})${colorReset}`
-            : ` ${fgColor.FgGray}(${safeDetailsGroup})${colorReset}`;
+        const detailString = item.details
+            ? ` ${fgColor.FgGray}(${item.detailsGroup} -- ${item.details})${colorReset}`
+            : ` ${fgColor.FgGray}(${item.detailsGroup})${colorReset}`;
 
-        console.log(` - ${safeName}${detailString}`);
+        console.log(`   - ${item.name}${detailString}`);
     });
 
     console.log(`\n`)

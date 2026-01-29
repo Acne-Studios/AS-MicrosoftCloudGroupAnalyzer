@@ -255,7 +255,10 @@ async function generateWebReport(arr) { // generates and opens a web report
             `
         }
 
-        htmlContent += `<div style="display: flex; justify-content: center"> <ul>`
+        // collapsible list of groups in scope (collapsed by default)
+        htmlContent += `<details style="display:flex; justify-content:center; margin-bottom:12px;">
+            <summary class="font-bold color-secondary" style="cursor:pointer;">Show group list</summary>
+            <div style="display: flex; justify-content: center; margin-top:8px;"> <ul>`;
 
         // list groups in scope
         debugLogger(`Looping over each group in scope`)
@@ -263,59 +266,65 @@ async function generateWebReport(arr) { // generates and opens a web report
             htmlContent += `<li>${escapeHtml(group.groupName || '')}</li>`;
         })
         
-        htmlContent += '</ul></div> <p></p>';
+        htmlContent += '</ul></div></details> <p></p>';
 
-        let printedServices = new Set();
-
+        // Group entries by groupName, then list services per group
         const normalized = (Array.isArray(arr) ? arr : [])
             .filter(Boolean)
             .map(item => ({
                 ...item,
-                service: (item && item.service) ? String(item.service) : 'Unknown service',
-                groupName: (item && item.groupName) ? String(item.groupName) : '',
-                name: (item && item.name) ? String(item.name) : '',
-                details: (item && item.details) ? String(item.details) : ''
+                service: item?.service ? String(item.service) : 'Unknown service',
+                groupName: item?.groupName ? String(item.groupName) : 'Unknown group',
+                name: item?.name ? String(item.name) : '(no name)',
+                details: item?.details ? String(item.details) : ''
             }))
-            .sort((a, b) => {
-                const serviceComparison = a.service.localeCompare(b.service);
-                if (serviceComparison !== 0) return serviceComparison;
-                return a.groupName.localeCompare(b.groupName);
-            });
+            .sort((a, b) => a.groupName.localeCompare(b.groupName) || a.service.localeCompare(b.service));
 
-        normalized.forEach(item => {
-            // if the service is not yet evaluated for the first time, then print the service
-            if (!printedServices.has(item.service)) {
-                // Close the previous ul if it was opened
-                if (printedServices.size > 0) {
-                    htmlContent += '</ul></div>';
-                }
-                
-                htmlContent += `
-                    <div class="box mt-4 p-4">
-                    <h3 class="mt-1"><span class="badge fs-2 font-bold color-accent px-2 py-2">${escapeHtml(item.service)}</span> <span class="fs-5 font-bold color-secondary">assignments:</span></h3>
-                    <ul class="list-group list-group-flush ms-3 color-secondary">`;
-                
-                printedServices.add(item.service);
-            }
-        
+        let currentGroup = '';
+        let currentService = '';
+        normalized.forEach((item, idx) => {
             const isUser = item.groupName.includes('@');
             const safeGroupName = escapeHtml(item.groupName);
+            const safeService = escapeHtml(item.service);
             const safeName = escapeHtml(item.name);
             const safeDetails = escapeHtml(item.details);
+
+            if (item.groupName !== currentGroup) {
+                // close previous list
+                if (idx !== 0) {
+                    htmlContent += '</ul></div>';
+                }
+                currentGroup = item.groupName;
+                currentService = '';
+                htmlContent += `
+                    <div class="box mt-4 p-4">
+                    <h3 class="mt-1"><span class="badge fs-2 font-bold color-accent px-2 py-2">${safeGroupName}</span></h3>
+                    <ul class="list-group list-group-flush ms-3 color-secondary">`;
+            }
+
+            if (item.service !== currentService) {
+                currentService = item.service;
+                htmlContent += `
+                    <li class="list-group-item list-group-item-secondary fw-bold">
+                        <div class="row align-items-center w-100">
+                            <div class="col">${safeService}</div>
+                        </div>
+                    </li>`;
+            }
 
             htmlContent += `
                 <li class="list-group-item d-flex justify-content-between align-items-start color-secondary">
                     
                 <div class="row align-items-center w-100">
-                        <div class="col font-bold"> ${isUser ? 'user' : 'group'}: <span class="badge-blue font-bold color-primary px-2 py-0">${safeGroupName}</span></div>
+                        <div class="col font-bold"><span class="badge-blue font-bold color-primary px-2 py-0">${safeGroupName}</span></div>
                         <div class="col font-bold">${safeName}</div>
                         <div class="col-3 text-end">${safeDetails}</div>
                     </div>
                 </li>`;
         });
-        
+
         // Close the last ul if it was opened
-        if (printedServices.size > 0) {
+        if (normalized.length > 0) {
             htmlContent += '</ul>';
         }
                   
