@@ -291,8 +291,8 @@ async function generateWebReport(arr) { // generates and opens a web report
         htmlContent += 
                 `</ul>
               </div>
-              <p class="text-center mt-5 mb-0"><a class="color-primary font-bold text-decoration-none" href="https://github.com/jasperbaes/Microsoft-Cloud-Group-Analyzer" target="_blank">Microsoft Cloud Group Analyzer</a>, made by <a class="color-accent font-bold text-decoration-none" href="https://www.linkedin.com/posts/jasper-baes_entraid-azure-activity-7157748584753319936-cqFX" target="_blank">Jasper Baes</a></p>
-              <p class="text-center mt-1 mb-5"><a class="color-secondary" href="https://github.com/jasperbaes/Microsoft-Cloud-Group-Analyzer" target="_blank">https://github.com/jasperbaes/Microsoft-Cloud-Group-Analyzer</a></p>
+              <p class="text-center mt-5 mb-0"><a class="color-primary font-bold text-decoration-none" href="https://github.com/jasperbaes/Microsoft-Cloud-Group-Analyzer" target="_blank">Microsoft Cloud Group Analyzer</a>, made by <a class="color-accent font-bold text-decoration-none" href="https://www.linkedin.com/posts/jasper-baes_entraid-azure-activity-7157748584753319936-cqFX" target="_blank">Jasper Baes</a>, modified for Acne Studios by <a class="color-accent font-bold text-decoration-none" href="https://www.linkedin.com/in/max-sundell/" target="_blank">Max Sundell</a></p>
+              <p class="text-center mt-1 mb-5"><a class="color-secondary" href="https://github.com/Acne-Studios/AS-MicrosoftCloudGroupAnalyzer" target="_blank">https://github.com/Acne-Studios/AS-MicrosoftCloudGroupAnalyzer</a></p>
             </body>
           </html>`;
         res.send(htmlContent);
