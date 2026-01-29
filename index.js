@@ -52,7 +52,7 @@ global.fgColor = {
     FgBlue: "\x1b[34m",
     FgMagenta: "\x1b[35m",
     FgCyan: "\x1b[36m",
-    FgGray: "\x1b[90m",
+    FgGray: "\x1b[93m",
 }
 
 global.colorReset = "\x1b[0m"
