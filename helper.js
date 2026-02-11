@@ -243,10 +243,13 @@ async function generateWebReport(arr) { // generates and opens a web report
               <title>Microsoft Cloud Group Analyzer</title>
             </head>
             <body>
-              <div class="container mt-4 mb-5">
+              <div class="container mt-4 mb-5 position-relative">
+                <div class="d-flex justify-content-end mb-3">
+                  <input type="search" id="groupSearch" class="form-control" placeholder="Search groups" style="max-width: 320px;">
+                </div>
                 <p class="text-center"><a class="text-decoration-none" href="https://github.com/jasperbaes/Microsoft-Cloud-Group-Analyzer" target="_blank"><img src="logo.png" alt="Logo" height="160"></a><p>
                 <h1 class="mb-0 text-center font-bold color-primary">Microsoft Cloud <span class="font-bold color-accent px-2 py-0">Group Analyzer</span></h1>
-                <p class="text-center mt-3 mb-5 font-bold color-secondary">Track where your Entra Groups are used! 💪</p>
+                <p class="text-center mt-3 mb-5 font-bold color-secondary">Comprehensive visibility into your Entra group assignments.</p>
         `
 
         if (global.groupsInScope?.length > 0) {
@@ -256,9 +259,10 @@ async function generateWebReport(arr) { // generates and opens a web report
         }
 
         // collapsible list of groups in scope (collapsed by default)
-        htmlContent += `<details style="display:flex; justify-content:center; margin-bottom:12px;">
-            <summary class="font-bold color-secondary" style="cursor:pointer;">Show group list</summary>
-            <div style="display: flex; justify-content: center; margin-top:8px;"> <ul>`;
+        htmlContent += `<div style="display:flex; justify-content:center; margin-bottom:12px;">
+            <details style="width:100%; max-width:720px; margin: 0 auto; text-align:center;">
+                <summary class="font-bold color-secondary" style="cursor:pointer; list-style-position: inside; display:inline-block;">Show group list</summary>
+                <div style="display: flex; justify-content: center; margin-top:8px;"> <ul style="text-align:left;">`;
 
         // list groups in scope
         debugLogger(`Looping over each group in scope`)
@@ -266,7 +270,7 @@ async function generateWebReport(arr) { // generates and opens a web report
             htmlContent += `<li>${escapeHtml(group.groupName || '')}</li>`;
         })
         
-        htmlContent += '</ul></div></details> <p></p>';
+        htmlContent += '</ul></div></details></div> <p></p>';
 
         // Group entries by groupName, then list services per group
         const normalized = (Array.isArray(arr) ? arr : [])
@@ -297,7 +301,7 @@ async function generateWebReport(arr) { // generates and opens a web report
                 currentGroup = item.groupName;
                 currentService = '';
                 htmlContent += `
-                    <div class="box mt-4 p-4">
+                    <div class="box mt-4 p-4 group-block" data-group-name="${safeGroupName.toLowerCase()}">
                     <h3 class="mt-1"><span class="badge fs-2 font-bold color-accent px-2 py-2">${safeGroupName}</span></h3>
                     <ul class="list-group list-group-flush ms-3 color-secondary">`;
             }
@@ -316,16 +320,15 @@ async function generateWebReport(arr) { // generates and opens a web report
                 <li class="list-group-item d-flex justify-content-between align-items-start color-secondary">
                     
                 <div class="row align-items-center w-100">
-                        <div class="col font-bold"><span class="badge-blue font-bold color-primary px-2 py-0">${safeGroupName}</span></div>
                         <div class="col font-bold">${safeName}</div>
                         <div class="col-3 text-end">${safeDetails}</div>
                     </div>
                 </li>`;
         });
 
-        // Close the last ul if it was opened
+        // Close the last ul and box if it was opened
         if (normalized.length > 0) {
-            htmlContent += '</ul>';
+            htmlContent += '</ul></div>';
         }
                   
         htmlContent += 
@@ -333,6 +336,24 @@ async function generateWebReport(arr) { // generates and opens a web report
               </div>
               <p class="text-center mt-5 mb-0"><a class="color-primary font-bold text-decoration-none" href="https://github.com/jasperbaes/Microsoft-Cloud-Group-Analyzer" target="_blank">Microsoft Cloud Group Analyzer</a>, made by <a class="color-accent font-bold text-decoration-none" href="https://www.linkedin.com/posts/jasper-baes_entraid-azure-activity-7157748584753319936-cqFX" target="_blank">Jasper Baes</a>, modified for <span class="font-bold">Acne Studios</span> by <a class="color-accent font-bold text-decoration-none" href="https://www.linkedin.com/in/max-sundell/" target="_blank">Max Sundell</a></p>
               <p class="text-center mt-1 mb-5"><a class="color-secondary" href="https://github.com/Acne-Studios/AS-MicrosoftCloudGroupAnalyzer" target="_blank">https://github.com/Acne-Studios/AS-MicrosoftCloudGroupAnalyzer</a></p>
+
+              <script>
+                (function() {
+                  const searchInput = document.getElementById('groupSearch');
+                  const groupBlocks = Array.from(document.querySelectorAll('.group-block'));
+                  if (!searchInput || groupBlocks.length === 0) return;
+
+                  const filter = () => {
+                    const q = searchInput.value.toLowerCase().trim();
+                    groupBlocks.forEach(block => {
+                      const name = (block.dataset.groupName || '').toLowerCase();
+                      block.style.display = q === '' || name.includes(q) ? '' : 'none';
+                    });
+                  };
+
+                  searchInput.addEventListener('input', filter);
+                })();
+              </script>
             </body>
           </html>`;
         res.send(htmlContent);
